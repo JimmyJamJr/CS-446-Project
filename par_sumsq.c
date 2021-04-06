@@ -22,15 +22,15 @@ long sum = 0;
 long odd = 0;
 long min = INT_MAX;
 long max = INT_MIN;
-volatile bool done = false;
-volatile int finished_threads = 0;
+volatile bool queue_empty = false;  // whether or not task queue is empty
+volatile int finished_threads = 0;  // number of worker threads finished
 
 // Mutex Locks
-pthread_mutex_t variables_mutex = PTHREAD_MUTEX_INITIALIZER;
-pthread_mutex_t queue_mutex = PTHREAD_MUTEX_INITIALIZER;
-pthread_cond_t cond_stop_idle = PTHREAD_COND_INITIALIZER;
-pthread_cond_t cond_thread_finished = PTHREAD_COND_INITIALIZER;
-pthread_cond_t cond_dequeue = PTHREAD_COND_INITIALIZER;
+pthread_mutex_t variables_mutex = PTHREAD_MUTEX_INITIALIZER;  // Aggregate Variables Mutex
+pthread_mutex_t queue_mutex = PTHREAD_MUTEX_INITIALIZER;  // Task Queue Mutex
+pthread_cond_t cond_stop_idle = PTHREAD_COND_INITIALIZER; // Worker Thread Stop Idle Condition
+pthread_cond_t cond_thread_finished = PTHREAD_COND_INITIALIZER; // Work Thread Finished Condition
+pthread_cond_t cond_dequeue = PTHREAD_COND_INITIALIZER; // Task Queue Dequeue Condition
 
 // Queue Node
 struct TaskNode {
@@ -47,12 +47,16 @@ struct TaskNode * new_node(char action, long num) {
   return n;
 }
 
-// Task Queue
+// Task Queue struct
 struct TaskQueue {
   struct TaskNode * front;
   struct TaskNode * back;
 };
 
+// Task Queue variable
+volatile struct TaskQueue * taskQueue;
+
+// Create a new Task Queue
 volatile struct TaskQueue * create_queue() {
   struct TaskQueue * q = (struct TaskQueue*) malloc(sizeof(struct TaskQueue));
   q->front = NULL;
@@ -60,6 +64,7 @@ volatile struct TaskQueue * create_queue() {
   return q;
 }
 
+// Add task to the back of a Task Queue
 void enqueue(volatile struct TaskQueue * q, char action, long num) {
   struct TaskNode* n = new_node(action, num);
   n->next = NULL;
@@ -73,6 +78,7 @@ void enqueue(volatile struct TaskQueue * q, char action, long num) {
   }
 }
 
+// Remove item at the front of Task Queue
 void dequeue(volatile struct TaskQueue * q) {
   if (q->front == NULL) return;
   struct TaskNode* n = q->front;
@@ -80,8 +86,6 @@ void dequeue(volatile struct TaskQueue * q) {
   if (q->front == NULL) q->back = NULL;
   free(n);
 }
-
-volatile struct TaskQueue * taskQueue;
 
 // function prototypes
 void calculate_square(long number);
@@ -125,9 +129,10 @@ void calculate_square(long number)
   pthread_mutex_unlock(&variables_mutex);
 }
 
-bool processing_done() {
+// Check if queue_empty variable is true, uses variables Mutex
+bool check_empty() {
   pthread_mutex_lock(&variables_mutex);
-  bool is_done = done;
+  bool is_done = queue_empty;
   pthread_mutex_unlock(&variables_mutex);
   return is_done;
 }
@@ -138,7 +143,8 @@ void * process_task(void * data) {
   // long id = *((long *) data);
 
   pthread_mutex_lock(&queue_mutex);
-  while (!processing_done()) {
+  // While queue not empty, dequeue task and process
+  while (!check_empty()) {
     if (taskQueue->front != NULL) {
       num = taskQueue->front->num;
       dequeue(taskQueue);
@@ -150,17 +156,19 @@ void * process_task(void * data) {
     }
     else {
       // printf("[Thread %d] idle\n", id);
+      // If queue empty, wait for stop idle condition from main
       pthread_cond_wait(&cond_stop_idle, &queue_mutex);
     }
   }
 
   pthread_mutex_unlock(&queue_mutex);
-
+  // Add 1 to finished_threads once done
   pthread_mutex_lock(&variables_mutex);
   finished_threads++;
   pthread_mutex_unlock(&variables_mutex);
 
   // printf("[Thread %d] done, total %d threads done\n", id, finished_threads);
+  // Signal to main that worker thread is finished
   pthread_cond_signal(&cond_thread_finished);
 
   return NULL;
@@ -204,6 +212,7 @@ int main(int argc, char* argv[])
   while (fscanf(fin, "%c %ld\n", &action, &num) == 2) {
     if (action == 'p') {
       if (thread_ct > 0) {
+        // Add task to queue
         pthread_mutex_lock(&queue_mutex);
         enqueue(taskQueue, action, num);
         pthread_mutex_unlock(&queue_mutex);
@@ -233,8 +242,9 @@ int main(int argc, char* argv[])
   pthread_mutex_unlock(&queue_mutex);
   // printf("[main] Task queue empty\n");
 
+  // Set queue_empty to true, then signal worker threads to stop idle so they can finish 
   pthread_mutex_lock(&variables_mutex);
-  done = true;
+  queue_empty = true;
   pthread_mutex_unlock(&variables_mutex);
   pthread_cond_broadcast(&cond_stop_idle);
   // printf("[main] Stop idle for all threads\n");
@@ -252,4 +262,3 @@ int main(int argc, char* argv[])
   // clean up and return
   return (EXIT_SUCCESS);
 }
-
