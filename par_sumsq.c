@@ -1,7 +1,8 @@
-/*
+/* Jimson Huang
+ * CS446
  * sumsq.c
  *
- * CS 446.646 Project 1 (Pthreads)
+ * CS 446.646 Project 5 (Pthreads)
  *
  * Compile with --std=c99
  */
@@ -14,7 +15,7 @@
 #include <pthread.h>
 
 // Max Worker Count
-#define MAX_WORKER_COUNT 99
+#define MAX_WORKER_COUNT 9999
 
 // aggregate variables
 long sum = 0;
@@ -134,7 +135,7 @@ bool processing_done() {
 // Worker Function
 void * process_task(void * data) {
   volatile long num;
-  int id = *((int *) data);
+  // long id = *((long *) data);
 
   pthread_mutex_lock(&queue_mutex);
   while (!processing_done()) {
@@ -143,12 +144,12 @@ void * process_task(void * data) {
       dequeue(taskQueue);
       pthread_cond_signal(&cond_dequeue);
       pthread_mutex_unlock(&queue_mutex);
-      printf("[Thread %d] starting task p %ld\n", id, num);
+      // printf("[Thread %d] starting task p %ld\n", id, num);
       calculate_square(num);
-      printf("[Thread %d] finished task p %ld\n", id, num);
+      // printf("[Thread %d] finished task p %ld\n", id, num);
     }
     else {
-      printf("[Thread %d] idle\n", id);
+      // printf("[Thread %d] idle\n", id);
       pthread_cond_wait(&cond_stop_idle, &queue_mutex);
     }
   }
@@ -159,7 +160,7 @@ void * process_task(void * data) {
   finished_threads++;
   pthread_mutex_unlock(&variables_mutex);
 
-  printf("[Thread %d] done, total %d threads done\n", id, finished_threads);
+  // printf("[Thread %d] done, total %d threads done\n", id, finished_threads);
   pthread_cond_signal(&cond_thread_finished);
 
   return NULL;
@@ -206,7 +207,7 @@ int main(int argc, char* argv[])
         pthread_mutex_lock(&queue_mutex);
         enqueue(taskQueue, action, num);
         pthread_mutex_unlock(&queue_mutex);
-        printf("[main] Task p %d added to queue\n", num);
+        // printf("[main] Task p %d added to queue\n", num);
         pthread_cond_signal(&cond_stop_idle);
       }
       else {
@@ -214,7 +215,7 @@ int main(int argc, char* argv[])
       }
     }
     else if (action == 'w') {
-      printf("[main] Waiting\n");
+      // printf("[main] Waiting\n");
       sleep(num);
     }
     else {
@@ -230,13 +231,13 @@ int main(int argc, char* argv[])
     pthread_cond_wait(&cond_dequeue, &queue_mutex);
   }
   pthread_mutex_unlock(&queue_mutex);
-  printf("[main] Task queue empty\n");
+  // printf("[main] Task queue empty\n");
 
   pthread_mutex_lock(&variables_mutex);
   done = true;
   pthread_mutex_unlock(&variables_mutex);
   pthread_cond_broadcast(&cond_stop_idle);
-  printf("[main] Stop idle for all threads\n");
+  // printf("[main] Stop idle for all threads\n");
 
   // Wait for threads to finish
   pthread_mutex_lock(&variables_mutex);
