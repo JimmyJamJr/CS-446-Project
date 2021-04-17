@@ -29,8 +29,8 @@ volatile int finished_threads = 0;  // number of worker threads finished
 pthread_mutex_t variables_mutex = PTHREAD_MUTEX_INITIALIZER;  // Aggregate Variables Mutex
 pthread_mutex_t queue_mutex = PTHREAD_MUTEX_INITIALIZER;  // Task Queue Mutex
 pthread_cond_t cond_stop_idle = PTHREAD_COND_INITIALIZER; // Worker Thread Stop Idle Condition
-pthread_cond_t cond_thread_finished = PTHREAD_COND_INITIALIZER; // Work Thread Finished Condition
-pthread_cond_t cond_dequeue = PTHREAD_COND_INITIALIZER; // Task Queue Dequeue Condition
+// pthread_cond_t cond_thread_finished = PTHREAD_COND_INITIALIZER; // Work Thread Finished Condition
+// pthread_cond_t cond_dequeue = PTHREAD_COND_INITIALIZER; // Task Queue Dequeue Condition
 
 // Queue Node
 struct TaskNode {
@@ -148,7 +148,7 @@ void * process_task(void * data) {
     if (taskQueue->front != NULL) {
       num = taskQueue->front->num;
       dequeue(taskQueue);
-      pthread_cond_signal(&cond_dequeue);
+      // pthread_cond_signal(&cond_dequeue);
       pthread_mutex_unlock(&queue_mutex);
       // printf("[Thread %d] starting task p %ld\n", id, num);
       calculate_square(num);
@@ -169,7 +169,7 @@ void * process_task(void * data) {
 
   // printf("[Thread %d] done, total %d threads done\n", id, finished_threads);
   // Signal to main that worker thread is finished
-  pthread_cond_signal(&cond_thread_finished);
+  // pthread_cond_signal(&cond_thread_finished);
 
   return NULL;
 }
@@ -235,11 +235,12 @@ int main(int argc, char* argv[])
   fclose(fin);
 
   // Wait for queue to empty
-  pthread_mutex_lock(&queue_mutex);
-  while (taskQueue->front != NULL) {
-    pthread_cond_wait(&cond_dequeue, &queue_mutex);
-  }
-  pthread_mutex_unlock(&queue_mutex);
+  // pthread_mutex_lock(&queue_mutex);
+  // while (taskQueue->front != NULL) {
+  //   pthread_cond_wait(&cond_dequeue, &queue_mutex);
+  // }
+  // pthread_mutex_unlock(&queue_mutex);
+  while (taskQueue->front != NULL);
   // printf("[main] Task queue empty\n");
 
   // Set queue_empty to true, then signal worker threads to stop idle so they can finish 
@@ -250,12 +251,12 @@ int main(int argc, char* argv[])
   // printf("[main] Stop idle for all threads\n");
 
   // Wait for threads to finish
-  pthread_mutex_lock(&variables_mutex);
-  while (finished_threads < thread_ct) {
-    pthread_cond_broadcast(&cond_stop_idle);
-    pthread_cond_wait(&cond_thread_finished, &variables_mutex);
-  }
-  pthread_mutex_unlock(&variables_mutex);
+  // pthread_mutex_lock(&variables_mutex);
+  // while (finished_threads < thread_ct) {
+  //   pthread_cond_wait(&cond_thread_finished, &variables_mutex);
+  // }
+  // pthread_mutex_unlock(&variables_mutex);
+  while (finished_threads < thread_ct);
   // print results
   printf("%ld %ld %ld %ld\n", sum, odd, min, max);
   
